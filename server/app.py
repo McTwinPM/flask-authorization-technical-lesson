@@ -4,7 +4,7 @@ from flask import Flask, make_response, request, session
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
 
-from models import db, User, UserSchema
+from models import DocumentSchema, db, User, UserSchema
 
 app = Flask(__name__)
 app.secret_key = b'Y\xf1Xz\x00\xad|eQ\x80t \xca\x1a\x10K'
@@ -46,6 +46,11 @@ class Logout(Resource):
         session['user_id'] = None
         return {'message': '204: No Content'}, 204
 
+@app.before_request
+def check_if_logged_in():
+    if not session['user_id'] and request.endpoint != 'document_list':
+        return {'error': 'Unauthorized'}, 401
+
 class Document(Resource):
     def get(self, id):
         document = Document.query.filter(Document.id == id).first()
@@ -79,11 +84,17 @@ class Document(Resource):
 
         return response 
 
+class DocumentList(Resource):
+    def get(self):
+        documents = Document.query.all()
+        return [DocumentSchema().dump(document) for document in documents]
+
 
 api.add_resource(Login, '/login')
 api.add_resource(CheckSession, '/check_session')
 api.add_resource(Logout, '/logout')
 api.add_resource(Document, '/documents/<int:id>')
+api.add_resource(DocumentList, '/documents', endpoint='document_list')
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
